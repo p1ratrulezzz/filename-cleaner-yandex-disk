@@ -228,7 +228,7 @@ fn clean_string(s: &str) -> String {
     }
 }
 
-/// Символы, которые часто отображаются как �� или являются «битыми»/невидимыми.
+/// Символы, которые часто отображаются как �� или являются «битыми»/невидимыми/эмодзи.
 fn is_broken_or_replacement(c: char) -> bool {
     // Replacement и non-characters
     if matches!(c, '\u{FFFD}' | '\u{FFFE}' | '\u{FFFF}' | '\u{FFFC}') {
@@ -246,8 +246,19 @@ fn is_broken_or_replacement(c: char) -> bool {
     if c.is_control() {
         return true;
     }
+    // Emoji и символы: Miscellaneous Symbols, Dingbats, Emoticons, Supplemental Symbols, etc.
+    // ⚔️ = U+2694 (CROSSED SWORDS) живёт здесь
+    if (0x2600..=0x27BF).contains(&cp)      // Misc Symbols + Dingbats
+        || (0x1F300..=0x1F9FF).contains(&cp) // Misc Symbols and Pictographs, Emoticons, etc.
+        || (0x1FA00..=0x1FAFF).contains(&cp) // Extended-A
+        || (0x2300..=0x23FF).contains(&cp)   // Misc Technical
+        || (0x2B00..=0x2BFF).contains(&cp)   // Misc Symbols and Arrows
+        || (0x1F000..=0x1F02F).contains(&cp) // Mahjong/Domino
+        || (0x1F0A0..=0x1F0FF).contains(&cp) // Playing cards
+    {
+        return true;
+    }
     // Unicode category Cf (Format): zero-width space, word joiner, soft hyphen, etc.
-    // Проверяем по кодовым точкам наиболее частых
     matches!(
         c,
         '\u{200B}' | // ZERO WIDTH SPACE
@@ -379,8 +390,15 @@ mod tests {
     }
 
     #[test]
+    fn test_clean_string_crossed_swords_and_replacement() {
+        // ⚔️ = U+2694 + U+FE0F, плюс U+FFFD
+        let input = "99. Mon Cœur - Chloé Stafler \u{FFFD}\u{FFFD}\u{2694}\u{FE0F} #originalsong #lyrics #musique #chanson #music #newartist";
+        let expected = "99. Mon Cœur - Chloé Stafler #originalsong #lyrics #musique #chanson #music #newartist";
+        assert_eq!(clean_string(input), expected);
+    }
+
+    #[test]
     fn test_clean_string_zero_width_and_replacement() {
-        // Реальный проблемный кейс: zero-width + U+FFFD + variation selector
         let input = "Karaoke Crochet 4   Douce   \u{200B}\u{2060}@clarayse3301 \u{FFFD}\u{FFFD}\u{FFFD}\u{FE0F} #cover #douce #clarayse  #chansonfrancaise";
         let expected = "Karaoke Crochet 4 Douce @clarayse3301 #cover #douce #clarayse #chansonfrancaise";
         assert_eq!(clean_string(input), expected);
