@@ -3,5 +3,9 @@ name = "filename_cleaner"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+gui = ["rfd"]
+
 [dependencies]
-rfd = "0.15"
+rfd = { version = "0.15", optional = true }
