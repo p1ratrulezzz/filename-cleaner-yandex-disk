@@ -30,32 +30,58 @@ fn run() -> Result<(), i32> {
     let mut changes: Vec<(PathBuf, String)> = Vec::new();
     let mut scanned = 0u32;
 
-    if let Ok(entries) = fs::read_dir(&folder) {
+    // Рекурсивный обход, чтобы не пропустить файлы в подпапках
+    let mut stack = vec![folder.clone()];
+    while let Some(dir) = stack.pop() {
+        let entries = match fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("Не удалось прочитать {}: {}", dir.display(), e);
+                continue;
+            }
+        };
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() {
-                scanned += 1;
-                if let Some(new_name) = compute_clean_name(&path) {
-                    let old_name = path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    if new_name != old_name {
-                        changes.push((path, new_name));
-                    }
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if !path.is_file() {
+                continue;
+            }
+            scanned += 1;
+            let old_name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            match compute_clean_name(&path) {
+                Some(new_name) if new_name != old_name => {
+                    println!("  [изменить] {}", old_name);
+                    println!("           → {}", new_name);
+                    changes.push((path, new_name));
+                }
+                Some(_) => {
+                    // уже чистое
+                }
+                None => {
+                    println!("  [пропуск]  {} (пустое имя после очистки)", old_name);
                 }
             }
         }
-    } else {
-        eprintln!("Не удалось прочитать содержимое папки.");
-        return Err(1);
     }
 
     println!("Просмотрено файлов: {}", scanned);
 
+    if scanned == 0 {
+        println!("\n=== ОТЧЁТ ===");
+        println!("В папке (и подпапках) не найдено ни одного файла.");
+        return Ok(());
+    }
+
     if changes.is_empty() {
         println!("\n=== ОТЧЁТ ===");
         println!("Нет файлов, требующих очистки.");
+        println!("(если файлы точно есть — пришлите точное имя одного из них)");
         return Ok(());
     }
 
