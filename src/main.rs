@@ -189,13 +189,16 @@ fn clean_string(s: &str) -> String {
         .replace(['’', '‘', '`'], "'")
         .replace(['“', '”', '«', '»'], "\"")
         .replace(['–', '—', '−'], "-")
-        .replace('…', "...")
-        .replace('\u{FFFD}', ""); // replacement character
+        .replace('…', "...");
 
     let mut result = String::new();
     let mut last_was_space = true; // чтобы не начинать с пробела
 
     for c in normalized.chars() {
+        // Явно выкидываем replacement character и похожие «битые» символы (��)
+        if is_broken_or_replacement(c) {
+            continue;
+        }
         if is_allowed(c) {
             if c.is_whitespace() {
                 if !last_was_space {
@@ -219,6 +222,18 @@ fn clean_string(s: &str) -> String {
     } else {
         trimmed
     }
+}
+
+/// Символы, которые часто отображаются как �� или являются «битыми».
+fn is_broken_or_replacement(c: char) -> bool {
+    matches!(
+        c,
+        '\u{FFFD}' | // REPLACEMENT CHARACTER
+        '\u{FFFE}' | // non-character
+        '\u{FFFF}' | // non-character
+        '\u{FFFC}'   // object replacement
+    ) || (c as u32) >= 0xFDD0 && (c as u32) <= 0xFDEF // non-characters
+        || c.is_control()
 }
 
 /// Разрешённые символы: буквы/цифры (включая Unicode/акценты), пробелы и безопасная пунктуация.
@@ -310,8 +325,23 @@ mod tests {
 
     #[test]
     fn test_clean_string_replacement_chars_and_emoji() {
-        let input = "02. I was recording a video, when all of a sudden… ��";
+        let input = "02. I was recording a video, when all of a sudden… \u{FFFD}\u{FFFD}";
         let expected = "02. I was recording a video, when all of a sudden";
+        assert_eq!(clean_string(input), expected);
+    }
+
+    #[test]
+    fn test_clean_string_double_replacement_display() {
+        // То, что часто отображается как ��
+        let input = "France\u{FFFD}\u{FFFD} #shorts";
+        let expected = "France #shorts";
+        assert_eq!(clean_string(input), expected);
+    }
+
+    #[test]
+    fn test_clean_string_noncharacters() {
+        let input = "file\u{FFFE}name\u{FFFF}test";
+        let expected = "filenametest";
         assert_eq!(clean_string(input), expected);
     }
 
