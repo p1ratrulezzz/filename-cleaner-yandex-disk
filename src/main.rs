@@ -28,11 +28,13 @@ fn run() -> Result<(), i32> {
     println!("Выбрана папка: {}", folder.display());
 
     let mut changes: Vec<(PathBuf, String)> = Vec::new();
+    let mut scanned = 0u32;
 
     if let Ok(entries) = fs::read_dir(&folder) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_file() {
+                scanned += 1;
                 if let Some(new_name) = compute_clean_name(&path) {
                     let old_name = path
                         .file_name()
@@ -48,6 +50,8 @@ fn run() -> Result<(), i32> {
         eprintln!("Не удалось прочитать содержимое папки.");
         return Err(1);
     }
+
+    println!("Просмотрено файлов: {}", scanned);
 
     if changes.is_empty() {
         println!("\n=== ОТЧЁТ ===");
@@ -224,16 +228,52 @@ fn clean_string(s: &str) -> String {
     }
 }
 
-/// Символы, которые часто отображаются как �� или являются «битыми».
+/// Символы, которые часто отображаются как �� или являются «битыми»/невидимыми.
 fn is_broken_or_replacement(c: char) -> bool {
+    // Replacement и non-characters
+    if matches!(c, '\u{FFFD}' | '\u{FFFE}' | '\u{FFFF}' | '\u{FFFC}') {
+        return true;
+    }
+    let cp = c as u32;
+    if (0xFDD0..=0xFDEF).contains(&cp) {
+        return true;
+    }
+    // Variation selectors (в т.ч. U+FE0F, который даёт �️)
+    if (0xFE00..=0xFE0F).contains(&cp) || (0xE0100..=0xE01EF).contains(&cp) {
+        return true;
+    }
+    // Zero-width и прочие format-символы (U+200B, U+2060, BOM и т.д.)
+    if c.is_control() {
+        return true;
+    }
+    // Unicode category Cf (Format): zero-width space, word joiner, soft hyphen, etc.
+    // Проверяем по кодовым точкам наиболее частых
     matches!(
         c,
-        '\u{FFFD}' | // REPLACEMENT CHARACTER
-        '\u{FFFE}' | // non-character
-        '\u{FFFF}' | // non-character
-        '\u{FFFC}'   // object replacement
-    ) || (c as u32) >= 0xFDD0 && (c as u32) <= 0xFDEF // non-characters
-        || c.is_control()
+        '\u{200B}' | // ZERO WIDTH SPACE
+        '\u{200C}' | // ZERO WIDTH NON-JOINER
+        '\u{200D}' | // ZERO WIDTH JOINER
+        '\u{200E}' | // LEFT-TO-RIGHT MARK
+        '\u{200F}' | // RIGHT-TO-LEFT MARK
+        '\u{202A}' | // LTR embedding
+        '\u{202B}' | // RTL embedding
+        '\u{202C}' | // pop directional
+        '\u{202D}' | // LTR override
+        '\u{202E}' | // RTL override
+        '\u{2060}' | // WORD JOINER
+        '\u{2061}' | // FUNCTION APPLICATION
+        '\u{2062}' | // INVISIBLE TIMES
+        '\u{2063}' | // INVISIBLE SEPARATOR
+        '\u{2064}' | // INVISIBLE PLUS
+        '\u{206A}' | // INHIBIT SYMMETRIC SWAPPING
+        '\u{206B}' | // ACTIVATE SYMMETRIC SWAPPING
+        '\u{206C}' | // INHIBIT ARABIC FORM SHAPING
+        '\u{206D}' | // ACTIVATE ARABIC FORM SHAPING
+        '\u{206E}' | // NATIONAL DIGIT SHAPES
+        '\u{206F}' | // NOMINAL DIGIT SHAPES
+        '\u{FEFF}' | // BOM / ZERO WIDTH NO-BREAK SPACE
+        '\u{00AD}'   // SOFT HYPHEN
+    )
 }
 
 /// Разрешённые символы: буквы/цифры (включая Unicode/акценты), пробелы и безопасная пунктуация.
@@ -339,9 +379,10 @@ mod tests {
     }
 
     #[test]
-    fn test_clean_string_noncharacters() {
-        let input = "file\u{FFFE}name\u{FFFF}test";
-        let expected = "filenametest";
+    fn test_clean_string_zero_width_and_replacement() {
+        // Реальный проблемный кейс: zero-width + U+FFFD + variation selector
+        let input = "Karaoke Crochet 4   Douce   \u{200B}\u{2060}@clarayse3301 \u{FFFD}\u{FFFD}\u{FFFD}\u{FE0F} #cover #douce #clarayse  #chansonfrancaise";
+        let expected = "Karaoke Crochet 4 Douce @clarayse3301 #cover #douce #clarayse #chansonfrancaise";
         assert_eq!(clean_string(input), expected);
     }
 
