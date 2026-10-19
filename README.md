@@ -28,15 +28,24 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-1. Установите Rust: https://rustup.rs/
-2. Откройте командную строку / PowerShell в папке проекта
-3. Выполните:
+## Сборка
+
+### Windows (с диалогом выбора папки)
+
+```bash
+cargo build --release --features gui
+```
+
+Готовый файл: `target/release/filename_cleaner.exe`
+
+### Linux (CLI, без системных зависимостей)
 
 ```bash
 cargo build --release
+./target/release/filename_cleaner /путь/к/папке
 ```
 
-Готовый `.exe` будет в `target/release/filename_cleaner.exe`
+Или без аргумента — программа спросит путь.
 
 ## Запуск
 

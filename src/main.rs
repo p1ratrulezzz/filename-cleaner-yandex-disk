@@ -1,20 +1,21 @@
+use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 fn main() {
-    println!("Выберите папку, в которой нужно почистить имена файлов...");
-
-    let folder = match rfd::FileDialog::new()
-        .set_title("Выберите папку для очистки имён файлов")
-        .pick_folder()
-    {
+    let folder = match pick_folder() {
         Some(path) => path,
         None => {
             println!("Папка не выбрана. Выход.");
             return;
         }
     };
+
+    if !folder.is_dir() {
+        eprintln!("Папка не найдена: {}", folder.display());
+        return;
+    }
 
     println!("Выбрана папка: {}", folder.display());
 
@@ -87,6 +88,45 @@ fn main() {
     }
 
     println!("\nГотово. Успешно: {}, ошибок: {}", success, failed);
+}
+
+/// Выбор папки: GUI (если собрано с --features gui), иначе CLI.
+fn pick_folder() -> Option<PathBuf> {
+    // 1. Аргумент командной строки имеет приоритет
+    if let Some(arg) = env::args().nth(1) {
+        return Some(PathBuf::from(arg.trim_matches('"')));
+    }
+
+    // 2. GUI-диалог (только если фича gui включена)
+    #[cfg(feature = "gui")]
+    {
+        println!("Выберите папку, в которой нужно почистить имена файлов...");
+        if let Some(path) = rfd::FileDialog::new()
+            .set_title("Выберите папку для очистки имён файлов")
+            .pick_folder()
+        {
+            return Some(path);
+        }
+        println!("Диалог отменён.");
+        return None;
+    }
+
+    // 3. CLI-ввод (Linux / сборка без GUI)
+    #[cfg(not(feature = "gui"))]
+    {
+        println!("Использование: filename_cleaner <путь_к_папке>");
+        println!("Или введите путь вручную.");
+        print!("Путь к папке: ");
+        io::stdout().flush().ok();
+        let mut input = String::new();
+        if io::stdin().read_line(&mut input).is_ok() {
+            let path = input.trim().trim_matches('"').to_string();
+            if !path.is_empty() {
+                return Some(PathBuf::from(path));
+            }
+        }
+        None
+    }
 }
 
 /// Вычисляет чистое имя файла (с расширением).
