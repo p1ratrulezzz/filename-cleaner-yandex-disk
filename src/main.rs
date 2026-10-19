@@ -4,17 +4,25 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 fn main() {
+    let result = run();
+    pause();
+    if let Err(code) = result {
+        std::process::exit(code);
+    }
+}
+
+fn run() -> Result<(), i32> {
     let folder = match pick_folder() {
         Some(path) => path,
         None => {
             println!("Папка не выбрана. Выход.");
-            return;
+            return Err(1);
         }
     };
 
     if !folder.is_dir() {
         eprintln!("Папка не найдена: {}", folder.display());
-        return;
+        return Err(1);
     }
 
     println!("Выбрана папка: {}", folder.display());
@@ -38,12 +46,13 @@ fn main() {
         }
     } else {
         eprintln!("Не удалось прочитать содержимое папки.");
-        return;
+        return Err(1);
     }
 
     if changes.is_empty() {
+        println!("\n=== ОТЧЁТ ===");
         println!("Нет файлов, требующих очистки.");
-        return;
+        return Ok(());
     }
 
     println!("\nПредлагаемые изменения ({} файлов):", changes.len());
@@ -58,36 +67,54 @@ fn main() {
     let mut input = String::new();
     if io::stdin().read_line(&mut input).is_err() {
         println!("Ошибка ввода. Отмена.");
-        return;
+        return Err(1);
     }
 
     if input.trim().to_lowercase() != "y" {
         println!("Отменено.");
-        return;
+        return Ok(());
     }
 
     println!("\nПереименование...");
     let mut success = 0;
     let mut failed = 0;
+    let mut report_lines: Vec<String> = Vec::new();
 
     for (old_path, new_name) in changes {
         let new_path = old_path.with_file_name(&new_name);
         let final_path = make_unique_path(new_path);
+        let old_display = old_path.file_name().unwrap().to_string_lossy().to_string();
 
         match fs::rename(&old_path, &final_path) {
             Ok(()) => {
-                let final_name = final_path.file_name().unwrap().to_string_lossy();
-                println!("  OK: {} → {}", old_path.file_name().unwrap().to_string_lossy(), final_name);
+                let final_name = final_path.file_name().unwrap().to_string_lossy().to_string();
+                println!("  OK: {} → {}", old_display, final_name);
+                report_lines.push(format!("OK   {} → {}", old_display, final_name));
                 success += 1;
             }
             Err(e) => {
                 eprintln!("  ОШИБКА: {} → {}: {}", old_path.display(), final_path.display(), e);
+                report_lines.push(format!("FAIL {} → {} ({})", old_display, new_name, e));
                 failed += 1;
             }
         }
     }
 
-    println!("\nГотово. Успешно: {}, ошибок: {}", success, failed);
+    println!("\n=== ОТЧЁТ ===");
+    println!("Успешно: {}", success);
+    println!("Ошибок:  {}", failed);
+    println!();
+    for line in &report_lines {
+        println!("  {}", line);
+    }
+
+    Ok(())
+}
+
+fn pause() {
+    println!("\nНажмите Enter для выхода...");
+    let mut dummy = String::new();
+    let _ = io::stdin().read_line(&mut dummy);
 }
 
 /// Выбор папки: GUI (если собрано с --features gui), иначе CLI.
