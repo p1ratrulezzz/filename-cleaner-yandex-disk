@@ -96,6 +96,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.artifact }}
-          generate_release_notes: true
+          # Не генерируем notes автоматически — иначе затирается
+          # changelog, который ты написал при создании релиза.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
