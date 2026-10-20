@@ -41,8 +41,8 @@ cargo build --release --features gui
 ### Linux (с диалогом выбора папки)
 
 ```bash
-# нужны системные пакеты для GTK и Wayland
-sudo apt-get install -y libgtk-3-dev pkg-config libwayland-dev
+# нужны системные пакеты для GTK
+sudo apt-get install -y libgtk-3-dev pkg-config
 cargo build --release
 ./target/release/filename_cleaner
 ```

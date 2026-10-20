@@ -8,4 +8,5 @@ default = ["gui"]
 gui = ["rfd"]
 
 [dependencies]
-rfd = { version = "0.15", optional = true }
+# gtk3 backend avoids the wayland-sys / wayland-client build dependency
+rfd = { version = "0.15", default-features = false, features = ["gtk3"], optional = true }
