@@ -38,14 +38,16 @@ cargo build --release --features gui
 
 Готовый файл: `target/release/filename_cleaner.exe`
 
-### Linux (CLI, без системных зависимостей)
+### Linux (с диалогом выбора папки)
 
 ```bash
+# нужны системные пакеты для GTK
+sudo apt-get install -y libgtk-3-dev pkg-config
 cargo build --release
-./target/release/filename_cleaner /путь/к/папке
+./target/release/filename_cleaner
 ```
 
-Или без аргумента — программа спросит путь.
+Запуск без аргументов открывает диалог. Путь можно также передать аргументом.
 
 ## Запуск
 
