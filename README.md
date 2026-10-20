@@ -49,6 +49,21 @@ cargo build --release
 
 Запуск без аргументов открывает диалог. Путь можно также передать аргументом.
 
+### macOS (universal)
+
+Собирается в CI: arm64 + x86_64 через `lipo`, затем упаковывается в DMG.
+Локально:
+
+```bash
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+cargo build --release --target aarch64-apple-darwin --features gui
+cargo build --release --target x86_64-apple-darwin --features gui
+lipo -create \
+  target/aarch64-apple-darwin/release/filename_cleaner \
+  target/x86_64-apple-darwin/release/filename_cleaner \
+  -output filename_cleaner
+```
+
 ## Запуск
 
 Просто запустите `filename_cleaner.exe` — появится диалог выбора папки.

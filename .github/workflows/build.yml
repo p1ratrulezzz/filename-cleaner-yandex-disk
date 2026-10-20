@@ -117,3 +117,71 @@ jobs:
           # Только файлы. Notes уже созданы job'ом create-release.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    name: Build macOS universal DMG
+    needs: [test, create-release]
+    if: always() && needs.test.result == 'success' && (needs.create-release.result == 'success' || needs.create-release.result == 'skipped')
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Run tests before build
+        run: cargo test --verbose --no-default-features
+
+      - name: Build arm64
+        run: cargo build --release --target aarch64-apple-darwin --features gui
+
+      - name: Build x86_64
+        run: cargo build --release --target x86_64-apple-darwin --features gui
+
+      - name: Create universal binary with lipo
+        run: |
+          lipo -create \
+            target/aarch64-apple-darwin/release/filename_cleaner \
+            target/x86_64-apple-darwin/release/filename_cleaner \
+            -output filename_cleaner
+          chmod +x filename_cleaner
+          lipo -info filename_cleaner
+          file filename_cleaner
+
+      - name: Package into DMG
+        run: |
+          rm -rf dmg_staging filename_cleaner-macos-universal.dmg
+          mkdir -p dmg_staging
+          cp filename_cleaner dmg_staging/
+          # Небольшая инструкция внутри образа
+          printf '%s\n' \
+            'Filename Cleaner' \
+            '' \
+            'Universal binary (Apple Silicon + Intel).' \
+            'Запуск: ./filename_cleaner' \
+            'Или перетащите в /usr/local/bin или ~/bin.' \
+            > dmg_staging/README.txt
+          hdiutil create \
+            -volname "Filename Cleaner" \
+            -srcfolder dmg_staging \
+            -ov \
+            -format UDZO \
+            filename_cleaner-macos-universal.dmg
+          ls -lh filename_cleaner-macos-universal.dmg
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: filename_cleaner-macos-universal.dmg
+          path: filename_cleaner-macos-universal.dmg
+
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: filename_cleaner-macos-universal.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
