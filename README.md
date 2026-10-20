@@ -42,7 +42,7 @@ cargo build --release --features gui
 
 ```bash
 # нужны системные пакеты для GTK
-sudo apt-get install -y libgtk-3-dev pkg-config
+sudo apt-get install -y libgtk-3-dev libglib2.0-dev pkg-config
 cargo build --release
 ./target/release/filename_cleaner
 ```
